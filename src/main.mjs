@@ -71,4 +71,15 @@ function sheetButton(app,html){
   const b=document.createElement('button');b.type='button';b.className='qnv-open header-control';b.title=s.enabled?'Abrir loja':'Configurar comerciante';b.setAttribute('aria-label',b.title);b.innerHTML='<i class="fa-solid fa-store"></i>';b.addEventListener('click',()=>{try{s.enabled?openShop(actor):configure(actor);}catch(e){notifyError(e);}});header.append(b);
 }
 Hooks.on('renderActorSheetV2',sheetButton);Hooks.on('renderActorSheet',sheetButton);
-Hooks.once('ready',()=>{if(game.system.id!=='skyfall')return;game.socket.on(channel,p=>{if(game.user.isGM)void handle(p);});game.modules.get(ID).api={open:openShop,configure};});
+Hooks.once('ready',()=>{if(game.system.id!=='skyfall')return;game.socket.on(channel,p=>{if(game.user.isGM)void handle(p);});const module=game.modules.get(ID);
+  // Protocolo de Integração QUEDAÇO v1. `open()` abre a loja do NPC (argumento) ou do token selecionado.
+  const open=target=>{
+    const actor=typeof target==='string'?game.actors.get(target):target?.documentName==='Actor'?target:canvas?.tokens?.controlled?.[0]?.actor;
+    if(!actor)return ui.notifications.info('Selecione um token de comerciante (ou use o botão da loja na ficha).');
+    return openShop(actor);
+  };
+  const descriptor=Object.freeze({family:'quedaco',contractVersion:1,id:module.id,title:module.title,version:module.version,
+    capabilities:Object.freeze({merchantMode:true,shopInterface:true,tradeApproval:true}),
+    open,openShop,configure,
+    getStatus:()=>({ready:game.system.id==='skyfall',...(game.user.isGM?{merchants:game.actors.filter(a=>shop(a).enabled).length}:{})})});
+  module.api=descriptor;Hooks.callAll('quedaco:register',descriptor);});

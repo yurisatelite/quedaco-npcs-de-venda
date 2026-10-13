@@ -10,3 +10,14 @@ test('venda remove item e repõe estoque',async()=>{const f=fixture();await tran
 test('não proprietário e loja fechada são recusados',async()=>{const f=fixture();f.buyer.testUserPermission=()=>false;await assert.rejects(transact(f.merchant,f.buyer,f.user,{kind:'buy',lines:[{id:'a',qty:1}]}));assert.equal(money(f.buyer.system.currency),100);});
 test('falha na gravação do estoque recupera entrega e saldo',async()=>{const f=fixture();let first=true;const update=f.merchant.update;f.merchant.update=async function(p){if(first){first=false;throw Error('Falhou');}return update.call(this,p);};await assert.rejects(transact(f.merchant,f.buyer,f.user,{kind:'buy',lines:[{id:'a',qty:1}]}));assert.equal(money(f.buyer.system.currency),100);assert.equal(f.buyer.items.size,0);assert.equal(f.merchant.flags[ID].shop.stock[0].qty,3);});
 test('sem saldo ou loja fechada não entrega',async()=>{for(const closed of [true,false]){const f=fixture();if(closed)f.merchant.flags[ID].shop.enabled=false;else f.buyer.system.currency=wallet(0);await assert.rejects(transact(f.merchant,f.buyer,f.user,{kind:'buy',lines:[{id:'a',qty:1}]}));assert.equal(f.buyer.items.size,0);assert.equal(f.merchant.flags[ID].shop.stock[0].qty,3);}});
+
+import {readFile} from 'node:fs/promises';
+test('publica o descritor do protocolo QUEDAÇO v1 sem expor dados privados',async()=>{
+  const main=await readFile(new URL('../src/main.mjs',import.meta.url),'utf8');
+  const manifest=JSON.parse(await readFile(new URL('../module.json',import.meta.url),'utf8'));
+  assert.match(main,/family:'quedaco'/);assert.match(main,/contractVersion:1/);
+  assert.match(main,/Hooks\.callAll\('quedaco:register',descriptor\)/);assert.match(main,/module\.api=descriptor/);
+  assert.match(main,/getStatus:\(\)=>\(\{ready:/);
+  assert.doesNotMatch(main,/getStatus:[^\n]*stock/);
+  assert.equal(manifest.id,'quedaco-npcs-de-venda');assert.match(manifest.title,/^QUEDAÇO - /);
+});

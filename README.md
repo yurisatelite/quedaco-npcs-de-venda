@@ -1,4 +1,4 @@
-# Quedaço NPCs de venda
+# QUEDAÇO - NPCs de venda
 
 Módulo independente para Foundry VTT 13 e Skyfall 1.0.1. Não requer QUEDAÇO.
 
@@ -21,3 +21,10 @@ Desenvolvimento: `npm test` e `npm run package`. O pacote instalável fica em `d
 Schema conferido no Skyfall local: moeda do personagem `system.currency.{k,p,t}`; 1 K = 1000 T, 1 P = 10 T. Mercadorias usam `system.price` inteiro em T e `system.quantity`. Tipos suportados: weapon, armor, clothing, equipment, consumable e loot. Fichas V2 são acessadas pelo hook `renderActorSheetV2`; V1 pelo `renderActorSheet`. Interface construída com DialogV2. Dados próprios em `flags.quedaco-npcs-de-venda.shop`; transporte pelo socket do módulo, com confirmação explícita da Mestra e validação de propriedade do comprador.
 
 Versão 0.1.0: primeira versão. Verificação em Node e do pacote; validação visual e funcional em uma sessão Foundry ainda necessária.
+
+## Protocolo de Integração QUEDAÇO (0.2.0)
+
+- id `quedaco-npcs-de-venda`, `contractVersion` 1, evento `quedaco:register`.
+- Capabilities: `merchantMode`, `shopInterface`, `tradeApproval`.
+- Métodos públicos: `open(actor|id)` (abre a loja do NPC ou do token selecionado), `openShop`, `configure` (Mestra), `getStatus` (somente leitura; a contagem de mercadores só aparece para a Mestra).
+- O QUEDAÇO principal reconhece os vendedores lendo a flag do módulo (somente leitura). Sem ele, tudo continua funcionando.
