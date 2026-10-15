@@ -10,12 +10,12 @@ function dialog(title,content,buttons,bind){
 async function configure(actor){
   if(!game.user.isGM)return;const s=shop(actor);
   dialog(`${actor.name} · Comerciante`,`
-    <label><input name="enabled" type="checkbox" ${s.enabled?'checked':''}> Ativar modo comerciante</label>
-    <label><input name="public" type="checkbox" ${s.public?'checked':''}> Liberar loja para jogadores</label>
-    <label>Preço de venda × <input name="markup" type="number" min="0" max="100" step="0.05" value="${esc(s.markup)}"></label>
-    <label>Revenda × <input name="buyRate" type="number" min="0" max="100" step="0.05" value="${esc(s.buyRate)}"></label>
+    <label class="qnv-check"><input name="enabled" type="checkbox" ${s.enabled?'checked':''}> Ativar modo comerciante</label>
+    <label class="qnv-check"><input name="public" type="checkbox" ${s.public?'checked':''}> Liberar loja para jogadores</label>
+    <label class="qnv-field">Preço de venda × <input name="markup" type="number" min="0" max="100" step="0.05" value="${esc(s.markup)}"></label>
+    <label class="qnv-field">Revenda × <input name="buyRate" type="number" min="0" max="100" step="0.05" value="${esc(s.buyRate)}"></label>
     <small>1 = preço de tabela. 0,5 = metade. Os multiplicadores são configuráveis.</small>
-    <label>Apresentação <input name="note" value="${esc(s.note)}"></label>
+    <label class="qnv-field">Apresentação <input name="note" value="${esc(s.note)}"></label>
     <small>Estoque independente do inventário pessoal. Configure os itens na loja depois de salvar.</small>`,[
     {action:'save',label:'Salvar',default:true,callback:async(_event,_button,d)=>{try{const root=d.element;const data={...s,enabled:root.querySelector('[name=enabled]').checked,public:root.querySelector('[name=public]').checked,markup:Number(root.querySelector('[name=markup]').value),buyRate:Number(root.querySelector('[name=buyRate]').value),note:root.querySelector('[name=note]').value};price(1,data.markup);price(1,data.buyRate);await actor.setFlag(ID,'shop',data);if(data.enabled)openShop(actor);}catch(e){notifyError(e);}}},
     {action:'cancel',label:'Fechar'}]);
@@ -25,13 +25,13 @@ export function openShop(actor,mode='buy',buyerId=''){
   const s=shop(actor);if(!s.enabled||(!s.public&&!game.user.isGM))return ui.notifications.warn('Loja fechada.');
   const buyers=buyerList(actor),buyer=buyers.find(a=>a.id===buyerId)??buyers[0];
   const entries=mode==='buy'?s.stock:buyer?.items.filter(goods).map(i=>({id:i.id,source:i.toObject(),price:i.system.price,qty:i.system.quantity}))??[];
-  const rows=entries.map(e=>`<div class="qnv-row"><img src="${esc(e.source.img)}"><span>${esc(e.source.name)}<br><small>Estoque: ${e.qty===null?'ilimitado':esc(e.qty)}</small></span><span>T$ ${price(e.price,mode==='buy'?s.markup:s.buyRate)}</span><input data-line="${esc(e.id)}" aria-label="Quantidade de ${esc(e.source.name)}" type="number" min="0" step="1" value="0"></div>`).join('');
+  const rows=entries.map(e=>`<div class="qnv-row"><img src="${esc(e.source.img)}" alt=""><span class="qnv-name">${esc(e.source.name)}<br><small>Estoque: ${e.qty===null?'ilimitado':esc(e.qty)}</small></span><span class="qnv-price">T$ ${price(e.price,mode==='buy'?s.markup:s.buyRate)}</span><input data-line="${esc(e.id)}" aria-label="Quantidade de ${esc(e.source.name)}" type="number" min="0" step="1" value="0"></div>`).join('');
   let d;d=dialog(`${actor.name} · Loja`,`${s.note?`<p>${esc(s.note)}</p>`:''}
-    <label>Personagem <select name="buyer">${buyers.map(a=>`<option value="${a.id}" ${a===buyer?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
+    <label class="qnv-field">Personagem <select name="buyer">${buyers.map(a=>`<option value="${a.id}" ${a===buyer?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
     <small>Saldo: T$ ${buyer?money(buyer.system.currency):0} · ${mode==='buy'?'Comprando da loja':'Vendendo para a loja'}</small>
     ${game.user.isGM?'<div class="qnv-drop">Arraste itens aqui para adicionar ao estoque.</div>':''}
-    ${rows||'<p>Nenhum item disponível.</p>'}
-    <strong data-total>Total: T$ 0</strong>
+    <div class="qnv-list">${rows||'<p class="qnv-empty">Nenhum item disponível.</p>'}</div>
+    <strong class="qnv-total" data-total>Total: T$ 0</strong>
     ${game.user.isGM?'<small>Para editar o estoque, use o botão Estoque.</small>':'<small>A Mestra confirma cada pedido. Ela precisa estar conectada.</small>'}`,[
       {action:'checkout',label:mode==='buy'?'Comprar selecionados':'Vender selecionados',default:true,callback:async(_e,_b,app)=>{try{const lines=[...app.element.querySelectorAll('[data-line]')].map(el=>({id:el.dataset.line,qty:integer(el.value)})).filter(l=>l.qty);if(!lines.length)throw Error('Selecione uma quantidade.');await requestTrade(actor,buyer,{kind:mode,lines});}catch(e){notifyError(e);}}},
       {action:'switch',label:mode==='buy'?'Vender meus itens':'Comprar',callback:()=>openShop(actor,mode==='buy'?'sell':'buy',buyer?.id)},
@@ -44,7 +44,7 @@ export function openShop(actor,mode='buy',buyerId=''){
 }
 function editStock(actor){
   if(!game.user.isGM)return;const s=shop(actor);
-  dialog(`${actor.name} · Estoque`,s.stock.map(e=>`<div class="qnv-row"><input data-remove="${e.id}" type="checkbox" title="Remover"><span>${esc(e.source.name)}</span><label>T$ <input data-price="${e.id}" type="number" min="0" value="${e.price}"></label><input data-qty="${e.id}" type="number" min="-1" value="${e.qty===null?-1:e.qty}" title="-1 = ilimitado"></div>`).join('')+'<small>Marque para remover. Quantidade -1 significa estoque ilimitado.</small>',[
+  dialog(`${actor.name} · Estoque`,'<div class="qnv-list">'+s.stock.map(e=>`<div class="qnv-row qnv-row--stock"><input data-remove="${e.id}" type="checkbox" title="Remover"><span class="qnv-name">${esc(e.source.name)}</span><label class="qnv-price">T$ <input data-price="${e.id}" type="number" min="0" value="${e.price}"></label><input data-qty="${e.id}" type="number" min="-1" value="${e.qty===null?-1:e.qty}" title="-1 = ilimitado"></div>`).join('')+'</div><small>Marque para remover. Quantidade -1 significa estoque ilimitado.</small>',[
     {action:'save',label:'Salvar',default:true,callback:async(_e,_b,d)=>{try{s.stock=s.stock.filter(e=>!d.element.querySelector(`[data-remove="${e.id}"]`).checked).map(e=>{const qty=integer(d.element.querySelector(`[data-qty="${e.id}"]`).value,-1);return {...e,price:integer(d.element.querySelector(`[data-price="${e.id}"]`).value),qty:qty===-1?null:qty};});await actor.setFlag(ID,'shop',s);openShop(actor);}catch(e){notifyError(e);}}},{action:'cancel',label:'Fechar'}]);
 }
 async function requestTrade(merchant,buyer,request){

@@ -2,7 +2,7 @@
   "id": "quedaco-npcs-de-venda",
   "title": "QUEDAÇO - NPCs de venda",
   "description": "Modo comerciante discreto nas fichas Skyfall. Estoque, carrinho, compra e venda com aprovação da Mestra.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "authors": [{"name": "Yuri"}],
   "compatibility": {"minimum": "13", "verified": "13", "maximum": "13"},
   "relationships": {"systems": [{"id": "skyfall", "type": "system", "compatibility": {"minimum": "1.0.1"}}]},
@@ -11,5 +11,5 @@
   "socket": true,
   "url": "https://github.com/yurisatelite/quedaco-npcs-de-venda",
   "manifest": "https://github.com/yurisatelite/quedaco-npcs-de-venda/releases/latest/download/module.json",
-  "download": "https://github.com/yurisatelite/quedaco-npcs-de-venda/releases/download/v0.2.0/quedaco-npcs-de-venda.zip"
+  "download": "https://github.com/yurisatelite/quedaco-npcs-de-venda/releases/download/v0.2.1/quedaco-npcs-de-venda.zip"
 }
