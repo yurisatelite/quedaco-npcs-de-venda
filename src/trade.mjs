@@ -3,14 +3,50 @@ export const GOODS=new Set(['weapon','armor','clothing','equipment','consumable'
 export function integer(value,min=0){const n=Number(value);if(!Number.isSafeInteger(n)||n<min)throw Error('Número inválido.');return n;}
 export function money(currency={}){return integer(currency.k??0)*1000+integer(currency.p??0)*10+integer(currency.t??0);}
 export function wallet(total){integer(total);return {k:Math.floor(total/1000),p:Math.floor(total%1000/10),t:total%10};}
-export function shop(actor){return {enabled:false,public:false,markup:1,buyRate:.5,stock:[],...actor?.flags?.[ID]?.shop};}
+function resolveItem(uuid){
+  try{return globalThis.fromUuidSync?.(uuid)??globalThis.game?.items?.get?.(String(uuid).split('.').pop())??null;}catch{return null;}
+}
+async function resolveItemAsync(uuid){
+  try{return await globalThis.fromUuid?.(uuid)??resolveItem(uuid);}catch{return resolveItem(uuid);}
+}
+function legacyStock(actor){
+  const old=actor?.flags?.quedaco?.npc?.shop;
+  if(!old||!Array.isArray(old.stock))return [];
+  return old.stock.flatMap(entry=>{
+    const uuid=String(entry?.uuid??'');if(!uuid)return [];
+    const document=resolveItem(uuid),source=document?.toObject?.();
+    if(!source||!goods(source))return [];
+    delete source._id;
+    return [{id:`legacy:${uuid}`,origin:uuid,source,price:entry.price==null?integer(source.system?.price??0):integer(entry.price),qty:entry.qty==null?null:integer(entry.qty),qtyMax:entry.qtyMax==null?null:integer(entry.qtyMax),note:String(entry.note??'')}];
+  });
+}
+export function shop(actor){
+  const current=actor?.flags?.[ID]?.shop??{},old=actor?.flags?.quedaco?.npc?.shop??{},stock=Array.isArray(current.stock)?current.stock:[];
+  const known=new Set(stock.map(entry=>entry.origin??entry.id));
+  const merged=[...stock,...legacyStock(actor).filter(entry=>!known.has(entry.origin))];
+  return {enabled:false,public:false,markup:1,buyRate:.5,...old,...current,stock:merged};
+}
+export async function hydrateShop(actor){
+  const current=shop(actor),old=actor?.flags?.quedaco?.npc?.shop;
+  if(!old||!Array.isArray(old.stock))return current;
+  const known=new Set(current.stock.map(entry=>entry.origin??entry.id));
+  const additions=[];
+  for(const entry of old.stock){
+    const uuid=String(entry?.uuid??'');if(!uuid||known.has(uuid))continue;
+    const document=await resolveItemAsync(uuid),source=document?.toObject?.();
+    if(!source||!goods(source))continue;
+    delete source._id;
+    additions.push({id:`legacy:${uuid}`,origin:uuid,source,price:entry.price==null?integer(source.system?.price??0):integer(entry.price),qty:entry.qty==null?null:integer(entry.qty),qtyMax:entry.qtyMax==null?null:integer(entry.qtyMax),note:String(entry.note??'')});
+  }
+  return additions.length?{...current,stock:[...current.stock,...additions]}:current;
+}
 export function price(base,rate){integer(base);rate=Number(rate);if(!Number.isFinite(rate)||rate<0||rate>100)throw Error('Multiplicador inválido.');return integer(Math.round(base*rate));}
 export function quantity(item){return integer(item.system?.quantity??1);}
 export function goods(item){return GOODS.has(item?.type);}
 export function assertAccess(merchant,buyer,user){const s=shop(merchant);if(!s.enabled||(!s.public&&!user.isGM))throw Error('Loja fechada.');if(!buyer||buyer.uuid===merchant.uuid||!buyer.system?.currency||!buyer.testUserPermission(user,'OWNER'))throw Error('Escolha uma ficha sua com moedas.');return s;}
 /** Chamado apenas pela Mestra; operações serializadas na camada de transporte. */
 export async function transact(merchant,buyer,user,request){
-  const s=assertAccess(merchant,buyer,user),before=money(buyer.system.currency);
+  const access=assertAccess(merchant,buyer,user),s=request.stock?{...access,stock:request.stock}:access,before=money(buyer.system.currency);
   const lines=request.lines;if(!Array.isArray(lines)||!lines.length||lines.length>100)throw Error('Pedido inválido.');
   const seen=new Set(),sources=[],updates=[],deletes=[];let total=0;
   const stock=structuredClone(s.stock);

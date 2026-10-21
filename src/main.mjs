@@ -1,4 +1,4 @@
-import {ID,shop,goods,integer,price,money,assertAccess,transact} from './trade.mjs';
+import {ID,shop,hydrateShop,goods,integer,price,money,assertAccess,transact} from './trade.mjs';
 import {bindTokenShop} from './token-shop.mjs';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const channel=`module.${ID}`;let queue=Promise.resolve();const processed=new Set();
@@ -21,9 +21,12 @@ async function configure(actor){
     {action:'save',label:'Salvar',default:true,callback:async(_event,_button,d)=>{try{const root=d.element;const data={...s,enabled:root.querySelector('[name=enabled]').checked,public:root.querySelector('[name=public]').checked,markup:Number(root.querySelector('[name=markup]').value),buyRate:Number(root.querySelector('[name=buyRate]').value),note:root.querySelector('[name=note]').value};price(1,data.markup);price(1,data.buyRate);await actor.setFlag(ID,'shop',data);if(data.enabled)openShop(actor);}catch(e){notifyError(e);}}},
     {action:'cancel',label:'Fechar'}]);
 }
-function buyerList(merchant){return game.actors.filter(a=>a.uuid!==merchant.uuid&&a.system?.currency&&a.testUserPermission(game.user,'OWNER'));}
-export function openShop(actor,mode='buy',buyerId=''){
-  const s=shop(actor);if(!s.enabled||(!s.public&&!game.user.isGM))return ui.notifications.warn('Loja fechada.');
+function buyerList(merchant){
+  const own=game.user?.character;
+  return [...new Map([...game.actors,...(own?[own]:[])].filter(a=>a.uuid!==merchant.uuid&&a.system?.currency&&a.testUserPermission(game.user,'OWNER')).map(a=>[a.uuid,a])).values()];
+}
+export async function openShop(actor,mode='buy',buyerId=''){
+  const s=await hydrateShop(actor);if(!s.enabled||(!s.public&&!game.user.isGM))return ui.notifications.warn('Loja fechada.');
   const buyers=buyerList(actor),buyer=buyers.find(a=>a.id===buyerId)??buyers[0];
   const entries=mode==='buy'?s.stock:buyer?.items.filter(goods).map(i=>({id:i.id,source:i.toObject(),price:i.system.price,qty:i.system.quantity}))??[];
   const rows=entries.map(e=>`<div class="qnv-row"><img src="${esc(e.source.img)}" alt=""><span class="qnv-name">${esc(e.source.name)}<br><small>Estoque: ${e.qty===null?'ilimitado':esc(e.qty)}</small></span><span class="qnv-price">T$ ${price(e.price,mode==='buy'?s.markup:s.buyRate)}</span><input data-line="${esc(e.id)}" aria-label="Quantidade de ${esc(e.source.name)}" type="number" min="0" step="1" value="0"></div>`).join('');
@@ -33,9 +36,9 @@ export function openShop(actor,mode='buy',buyerId=''){
     ${game.user.isGM?'<div class="qnv-drop">Arraste itens aqui para adicionar ao estoque.</div>':''}
     <div class="qnv-list">${rows||'<p class="qnv-empty">Nenhum item disponível.</p>'}</div>
     <strong class="qnv-total" data-total>Total: T$ 0</strong>
-    ${game.user.isGM?'<small>Para editar o estoque, use o botão Estoque.</small>':'<small>A Mestra confirma cada pedido. Ela precisa estar conectada.</small>'}`,[
+    ${game.user.isGM?'<small>Para editar o estoque, use o botão Estoque.</small>':'<small>A loja está liberada. A transação será registrada automaticamente.</small>'}`,[
       {action:'checkout',label:mode==='buy'?'Comprar selecionados':'Vender selecionados',default:true,callback:async(_e,_b,app)=>{try{const lines=[...app.element.querySelectorAll('[data-line]')].map(el=>({id:el.dataset.line,qty:integer(el.value)})).filter(l=>l.qty);if(!lines.length)throw Error('Selecione uma quantidade.');await requestTrade(actor,buyer,{kind:mode,lines});}catch(e){notifyError(e);}}},
-      {action:'switch',label:mode==='buy'?'Vender meus itens':'Comprar',callback:()=>openShop(actor,mode==='buy'?'sell':'buy',buyer?.id)},
+      {action:'switch',label:mode==='buy'?'Vender meus itens':'Comprar',callback:()=>void openShop(actor,mode==='buy'?'sell':'buy',buyer?.id)},
       ...(game.user.isGM?[{action:'stock',label:'Estoque',callback:()=>editStock(actor)},{action:'settings',label:'Configurar',callback:()=>configure(actor)}]:[]),
       {action:'close',label:'Fechar'}],root=>{
         root.querySelector('[name=buyer]')?.addEventListener('change',e=>{d.close();openShop(actor,mode,e.target.value);});
@@ -57,11 +60,10 @@ async function handle(p){
   if(gm()?.id!==game.user.id||!p?.id||processed.has(p.id))return;
   processed.add(p.id);if(processed.size>2000)processed.delete(processed.values().next().value);
   queue=queue.then(async()=>{try{
-    const merchant=await fromUuid(p.merchant),buyer=await fromUuid(p.buyer),user=game.users.get(p.user);if(!user)throw Error('Usuário não encontrado.');const s=assertAccess(merchant,buyer,user);
+    const merchant=await fromUuid(p.merchant),buyer=await fromUuid(p.buyer),user=game.users.get(p.user);if(!user)throw Error('Usuário não encontrado.');const s=await hydrateShop(merchant);assertAccess(merchant,buyer,user);
     if(!Array.isArray(p.lines)||!p.lines.length||p.lines.length>100)throw Error('Pedido inválido.');
     const details=p.lines.map(l=>{const entry=p.kind==='buy'?s.stock.find(e=>e.id===l.id):buyer.items.get(l.id);if(!entry)throw Error('Item indisponível.');return `${esc(entry.source?.name??entry.name)} × ${integer(l.qty,1)} — T$ ${price(entry.price??entry.system?.price,p.kind==='buy'?s.markup:s.buyRate)*l.qty}`;}).join('<br>');
-    if(!user.isGM){const approved=await foundry.applications.api.DialogV2.confirm({window:{title:'Confirmar negociação'},content:`<p>${esc(user.name)} solicita ${p.kind==='buy'?'compra':'venda'} com ${esc(merchant.name)} usando ${esc(buyer.name)}.</p><p>${details}</p>`});if(!approved)return;}
-    const result=await transact(merchant,buyer,user,p);
+    const result=await transact(merchant,buyer,user,{...p,stock:s.stock});
     await ChatMessage.create({content:`<p>${esc(buyer.name)} ${p.kind==='buy'?'comprou de':'vendeu para'} ${esc(merchant.name)}.</p><p>${details}</p><p>Total: T$ ${result.total}</p>`,whisper:[...new Set([user.id,...game.users.filter(u=>u.isGM).map(u=>u.id)])]});
     ui.notifications.info('Negociação concluída.');
   }catch(e){notifyError(e);}});await queue;

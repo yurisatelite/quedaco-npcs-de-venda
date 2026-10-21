@@ -1,3 +1,14 @@
+## 0.2.3 — Estoque do QUEDAÇO e compra automática
+
+- Reconhece e carrega o estoque já cadastrado em `flags.quedaco.npc.shop.stock`, resolvendo os Items por UUID.
+- Exibe a bolsa do personagem na janela da loja e inclui o personagem associado ao usuário na seleção.
+- Loja liberada não abre confirmação adicional da Mestra; a transação continua validada pelo servidor e gravada pelo GM ativo.
+- Mantém os itens e modelos existentes dos NPCs; a migração do estoque acontece ao acessar a loja.
+
+Validação: 13 testes automatizados passaram; pacote conferido. Compra com jogador e os NPCs reais ainda precisam ser conferidos no Foundry 13.
+
+---
+
 ## 0.2.2 — Loja pelo token para jogadores
 
 - Um clique esquerdo simples no token visível do negociante abre sua loja pública, com a ferramenta de tokens ativa.
