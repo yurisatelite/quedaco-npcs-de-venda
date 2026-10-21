@@ -1,3 +1,15 @@
+## 0.2.2 — Loja pelo token para jogadores
+
+- Um clique esquerdo simples no token visível do negociante abre sua loja pública, com a ferramenta de tokens ativa.
+- Não exige abrir o painel do QUEDAÇO nem acesso de observador à ficha completa. A loja precisa estar ativada e liberada pela Mestra.
+- Cliques com modificadores, tokens ocultos, lojas fechadas e controles da Mestra preservam seu comportamento.
+- Compras e vendas continuam exigindo uma ficha própria e aprovação da Mestra conectada.
+- ZIP usa caminhos compatíveis com hospedagem Linux.
+
+Validação: 12 testes automatizados passaram; pacote conferido. Clique e transação com usuário jogador ainda precisam ser conferidos no Foundry 13. Funciona sem o QUEDAÇO principal.
+
+---
+
 Primeira versão independente do Quedaço NPCs de venda, para Foundry VTT 13 e Skyfall 1.0.1.
 
 - Ícone discreto de comerciante nas fichas, com ativação pela Mestra.

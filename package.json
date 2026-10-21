@@ -1,1 +1,1 @@
-{"name":"quedaco-npcs-de-venda","version": "0.2.1","private":true,"type":"module","scripts":{"test":"node --test","package":"powershell -NoProfile -File tools/package.ps1"}}
+{"name":"quedaco-npcs-de-venda","version": "0.2.2","private":true,"type":"module","scripts":{"test":"node --test","package":"powershell -NoProfile -File tools/package.ps1"}}
