@@ -1,4 +1,5 @@
 import {ID,shop,goods,integer,price,money,assertAccess,transact} from './trade.mjs';
+import {bindTokenShop} from './token-shop.mjs';
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const channel=`module.${ID}`;let queue=Promise.resolve();const processed=new Set();
 const gm=()=>game.users.filter(u=>u.active&&u.isGM).sort((a,b)=>a.id.localeCompare(b.id))[0];
@@ -71,6 +72,14 @@ function sheetButton(app,html){
   const b=document.createElement('button');b.type='button';b.className='qnv-open header-control';b.title=s.enabled?'Abrir loja':'Configurar comerciante';b.setAttribute('aria-label',b.title);b.innerHTML='<i class="fa-solid fa-store"></i>';b.addEventListener('click',()=>{try{s.enabled?openShop(actor):configure(actor);}catch(e){notifyError(e);}});header.append(b);
 }
 Hooks.on('renderActorSheetV2',sheetButton);Hooks.on('renderActorSheet',sheetButton);
+let unbindTokenShop=()=>{};
+Hooks.on('canvasReady',canvas=>{
+  unbindTokenShop();
+  if(game.system.id==='skyfall')unbindTokenShop=bindTokenShop(canvas,game.user,actor=>{
+    try{openShop(actor);}catch(error){notifyError(error);}
+  });
+});
+Hooks.on('canvasTearDown',()=>{unbindTokenShop();unbindTokenShop=()=>{};});
 Hooks.once('ready',()=>{if(game.system.id!=='skyfall')return;game.socket.on(channel,p=>{if(game.user.isGM)void handle(p);});const module=game.modules.get(ID);
   // Protocolo de Integração QUEDAÇO v1. `open()` abre a loja do NPC (argumento) ou do token selecionado.
   const open=target=>{
